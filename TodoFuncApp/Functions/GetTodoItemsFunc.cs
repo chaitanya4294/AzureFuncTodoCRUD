@@ -8,6 +8,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Microsoft.Azure.Cosmos;
+using TodoFuncApp.Models;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace TodoFuncApp.Functions
 {
@@ -21,23 +24,36 @@ namespace TodoFuncApp.Functions
         }
 
         [FunctionName("GetTodoItems")]
-        public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req,
+        public async Task<IActionResult> Run(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
             ILogger log)
         {
             log.LogInformation("Getting all Todo Items...");
 
-            string name = req.Query["name"];
+            QueryDefinition query = new QueryDefinition(
+                "select * from TodoItems");
 
-            string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
-            name = name ?? data?.name;
+            var container = this._cosmosClient.GetContainer("TodoDB", "TodoItems");
 
-            string responseMessage = string.IsNullOrEmpty(name)
-                ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-                : $"Hello, {name}. This HTTP triggered function executed successfully.";
+            List<Todo> todoItemsList = new List<Todo>();
+            using (FeedIterator<Todo> resultSet = container.GetItemQueryIterator<Todo>(query))
+            {
+                while (resultSet.HasMoreResults)
+                {
+                    FeedResponse<Todo> response = await resultSet.ReadNextAsync();
+                    Todo todoItem = response.First();
+                    log.LogInformation($"Id: {todoItem.Id};");
+                    if (response.Diagnostics != null)
+                    {
+                        Console.WriteLine($" Diagnostics {response.Diagnostics.ToString()}");
+                    }
 
-            return new OkObjectResult(responseMessage);
+                    todoItemsList.AddRange(response);
+
+                }
+            }
+
+            return new OkObjectResult(todoItemsList);
         }
     }
 }
