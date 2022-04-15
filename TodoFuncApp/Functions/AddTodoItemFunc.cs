@@ -15,15 +15,15 @@ namespace TodoFuncApp.Functions
     public class AddTodoItemFunc
     {
 
-        private CosmosClient _cosmosClient;
+        private readonly CosmosClient _cosmosClient;
         public AddTodoItemFunc(CosmosClient cosmosClient)
         {
             this._cosmosClient = cosmosClient;
         }
 
-        [FunctionName("AddTodoItem")]
+        [FunctionName("AddTodoItemFunc")]
         public async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "TodoItem")] HttpRequest req,
             ILogger log)
         {
             log.LogInformation("Creating a new Todo Item...");

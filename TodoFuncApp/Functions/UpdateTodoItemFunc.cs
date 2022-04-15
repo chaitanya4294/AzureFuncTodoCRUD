@@ -7,6 +7,9 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Microsoft.Azure.Documents.Client;
+using TodoFuncApp.Models;
+using System.Linq;
 
 namespace TodoFuncApp.Functions
 {
@@ -14,22 +17,45 @@ namespace TodoFuncApp.Functions
     {
         [FunctionName("UpdateTodoItemFunc")]
         public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = null)] HttpRequest req,
-            ILogger log)
+            [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "TodoItem/{id}")] HttpRequest req,
+            [CosmosDB(ConnectionStringSetting = "CosmosDBConnection")] DocumentClient client,
+            ILogger log, string id)
         {
-            log.LogInformation("C# HTTP trigger function processed a request.");
-
-            string name = req.Query["name"];
-
             string requestBody = await new StreamReader(req.Body).ReadToEndAsync();
-            dynamic data = JsonConvert.DeserializeObject(requestBody);
-            name = name ?? data?.name;
+            var updated = JsonConvert.DeserializeObject<Todo>(requestBody);
+            Uri collectionUri = UriFactory.CreateDocumentCollectionUri("TodoDB", "TodoItems");
+            var document = client.CreateDocumentQuery(collectionUri).Where(t => t.Id == id)
+                            .AsEnumerable().FirstOrDefault();
+            if (document == null)
+            {
+                return new NotFoundResult();
+            }
 
-            string responseMessage = string.IsNullOrEmpty(name)
-                ? "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response."
-                : $"Hello, {name}. This HTTP triggered function executed successfully.";
+            if (!string.IsNullOrEmpty(updated.Title))
+            {
+                document.SetPropertyValue("Title", updated.Title);
+            }
 
-            return new OkObjectResult(responseMessage);
+            if (!string.IsNullOrEmpty(updated.Description))
+            {
+                document.SetPropertyValue("Description", updated.Description);
+            }
+
+            await client.ReplaceDocumentAsync(document);
+
+            /* var todo = new Todo()
+            {
+                Id = document.GetPropertyValue<string>("id"),
+                CreatedTime = document.GetPropertyValue<DateTime>("CreatedTime"),
+                TaskDescription = document.GetPropertyValue<string>("TaskDescription"),
+                IsCompleted = document.GetPropertyValue<bool>("IsCompleted")
+            };*/
+
+            // an easier way to deserialize a Document
+            Todo todo = (dynamic)document;
+
+
+            return new OkObjectResult(todo);
         }
     }
 }

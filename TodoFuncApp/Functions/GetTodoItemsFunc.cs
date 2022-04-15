@@ -17,21 +17,20 @@ namespace TodoFuncApp.Functions
     public class GetTodoItemsFunc
     {
 
-        private CosmosClient _cosmosClient;
+        private readonly CosmosClient _cosmosClient;
         public GetTodoItemsFunc(CosmosClient cosmosClient)
         {
             this._cosmosClient = cosmosClient;
         }
 
-        [FunctionName("GetTodoItems")]
+        [FunctionName("GetTodoItemsFunc")]
         public async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "TodoItems")] HttpRequest req,
             ILogger log)
         {
             log.LogInformation("Getting all Todo Items...");
 
-            QueryDefinition query = new QueryDefinition(
-                "select * from TodoItems");
+            QueryDefinition query = new QueryDefinition("select * from TodoItems");
 
             var container = this._cosmosClient.GetContainer("TodoDB", "TodoItems");
 
@@ -43,10 +42,6 @@ namespace TodoFuncApp.Functions
                     FeedResponse<Todo> response = await resultSet.ReadNextAsync();
                     Todo todoItem = response.First();
                     log.LogInformation($"Id: {todoItem.Id};");
-                    if (response.Diagnostics != null)
-                    {
-                        Console.WriteLine($" Diagnostics {response.Diagnostics.ToString()}");
-                    }
 
                     todoItemsList.AddRange(response);
 
